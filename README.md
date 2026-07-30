@@ -1,6 +1,8 @@
 # zsh-ai-complete
 
-Local LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X**, and the suggested command replaces the buffer — never auto-executed.
+Local LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X**, and the suggested command appears as **ghost text** (preview) — never auto-executed.
+
+> Branch `experiment/ghost-text`. Dislike it? `git checkout main` and reload the shell — or set `AI_COMPLETE_MODE=replace` in config.
 
 Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`).
 
@@ -26,18 +28,20 @@ AI_COMPLETE_API_KEY=your-omlx-api-key
 
 Reload the shell (`source ~/.zshrc` or open a new tab).
 
-## Usage
+## Usage (ghost mode)
 
-1. Type a free-text intent in the prompt, e.g. `finde alle pdfs im aktuellen verzeichnis`
-2. Press **Ctrl+X** twice
-3. Review the command in the buffer
-4. Press Enter to run it yourself — or **Ctrl+X u** to restore the free text
+1. Type a free-text intent, e.g. `finde alle pdfs im aktuellen verzeichnis`
+2. Press **Ctrl+X** twice → suggestion shows as dim ghost text (`!!! …` + reverse video if safety warn)
+3. **Accept** (into the buffer, still not run): **Tab**, **→**, **Enter**, or **Ctrl+X Ctrl+X** again
+4. Press **Enter** again to run — or discard first
 
-Also bound (if your terminal sends Esc+ for Option): **⌥+Enter**.
+**Discard** ghost / restore free text: **Ctrl+X u**, **Ctrl+G**, **Backspace**, or just start typing.
 
-> Note: Classic `Ctrl+_` undo is awkward on German keyboards; use **Ctrl+X** then **u**.
+Also bound (if Option sends Esc+): **⌥+Enter**.
 
-Destructive patterns (e.g. `rm -rf /`, force-push to main) still land in the buffer, but show a warning via `zle -M`.
+Fallback without ghost: set `AI_COMPLETE_MODE=replace` in `config.env`.
+
+Successful intents are appended to zsh history as `# …` (safe comment if `interactivecomments` is on — the plugin enables it).
 
 ### Helpers
 
@@ -67,20 +71,15 @@ Environment / `~/.config/zsh-ai-complete/config.env`:
 | `AI_COMPLETE_API_KEY`  | *(optional)*                    | Bearer token when oMLX auth is on          |
 | `AI_COMPLETE_TIMEOUT`  | `30`                            | Seconds                                    |
 | `AI_COMPLETE_HISTORY`  | `8`                             | Recent history lines sent as context       |
+| `AI_COMPLETE_MODE`     | `ghost`                         | `ghost` (preview) or `replace` (old behavior) |
+| `AI_COMPLETE_SAVE_PROMPTS` | `1`                         | Write `# …` intents into zsh history       |
 | `AI_COMPLETE_ENABLED`  | `1`                             | `0` disables the widget                    |
 
 ## Safety
 
-`lib/safety.sh` flags patterns such as:
+`lib/safety.sh` loads curated bash-ERE patterns from [`lib/dangerous.patterns`](lib/dangerous.patterns) and **warns** (still inserts) on matches such as broad `rm -rf`, `dd`/`mkfs`/`diskutil`, force-push to main, `curl|bash`, macOS wipe helpers, etc.
 
-- `rm -rf` on `/`, `~`, or `$HOME`
-- `dd if=…`
-- `mkfs`, `diskutil erase`
-- `git push --force` / `-f` to `main`/`master`
-- `chmod … 777`
-- fork bombs, redirects to `/dev/sd*`
-
-v1 behavior: **warn and still insert**.
+Patterns are a curated subset rewritten for bash `[[ =~ ]]`, inspired by **[hardstop-patterns](https://github.com/frmoretto/hardstop-patterns)** (MIT). Attribution: [`NOTICE`](NOTICE). Related: [hardstop](https://github.com/frmoretto/hardstop). Override path with `AI_COMPLETE_PATTERNS_FILE`.
 
 ```bash
 ./tests/test_safety.sh
@@ -91,12 +90,14 @@ v1 behavior: **warn and still insert**.
 ```
 bin/ai-complete                 # bash client
 lib/context.sh                  # cwd / git / history / os
-lib/safety.sh                   # destructive pattern check
+lib/safety.sh                   # pattern loader + check
+lib/dangerous.patterns          # curated warn list (bash ERE)
+NOTICE                          # hardstop-patterns attribution (MIT)
 plugin/ai-complete.plugin.zsh   # ZLE widget + Ctrl+X Ctrl+X
 config/default.env              # install template
 install.sh
 ```
 
-## Not in v1
+## Not in scope (yet)
 
-Ghost text, response cache, Anthropic `/v1/messages`, streaming, daemon lifecycle.
+Full hardstop/dcg runtime, response cache, Anthropic `/v1/messages`, streaming, daemon lifecycle.

@@ -5,55 +5,52 @@
 #   stdout: matched pattern description (if any)
 #   exit 0: clean
 #   exit 2: warning (destructive pattern matched)
+#
+# Patterns: lib/dangerous.patterns (curated; see NOTICE for attribution)
+
+ai_complete_patterns_file() {
+  if [[ -n "${AI_COMPLETE_PATTERNS_FILE:-}" ]]; then
+    printf '%s\n' "$AI_COMPLETE_PATTERNS_FILE"
+    return
+  fi
+  local root="${AI_COMPLETE_ROOT:-}"
+  if [[ -z "$root" ]]; then
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  fi
+  printf '%s\n' "$root/lib/dangerous.patterns"
+}
 
 ai_complete_safety_check() {
   local cmd="${1:-}"
 
-  # bash [[ =~ ]] uses ERE (no \b). Keep patterns simple and explicit.
-  if [[ "$cmd" =~ rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(/|~(/|$)|\$HOME|\$\{HOME\}) ]]; then
-    echo "rm -rf on / or home"
+  # Fork bomb — bare & breaks some [[ =~ ]] parses; keep as string match
+  if [[ "$cmd" == *':()'* && "$cmd" == *'|:&'* ]]; then
+    echo "fork bomb"
     return 2
   fi
-
-  if [[ "$cmd" =~ (^|[[:space:]])dd[[:space:]] ]] && [[ "$cmd" =~ if= ]]; then
-    echo "dd if="
-    return 2
-  fi
-
-  if [[ "$cmd" =~ (^|[[:space:];|&])mkfs([.]|[[:space:]]) ]]; then
-    echo "mkfs"
-    return 2
-  fi
-
-  if [[ "$cmd" =~ git[[:space:]]+push[[:space:]] ]] && [[ "$cmd" =~ (--force|[[:space:]]-f([[:space:]]|$)) ]] && [[ "$cmd" =~ (main|master) ]]; then
-    echo "git push --force to main/master"
-    return 2
-  fi
-
-  if [[ "$cmd" =~ chmod[[:space:]]+(-R[[:space:]]+)?777([[:space:]]|$) ]]; then
-    echo "chmod 777"
-    return 2
-  fi
-
-  # Fork bomb: :(){ :|:& };:  — avoid bare & inside [[ =~ ]] (breaks parse)
   if [[ "$cmd" == *':()'* && "$cmd" == *':|:'* && "$cmd" == *'};:'* ]]; then
     echo "fork bomb"
     return 2
   fi
-  if [[ "$cmd" == *':(){'* && "$cmd" == *'|:&'* ]]; then
-    echo "fork bomb"
-    return 2
+
+  local patterns
+  patterns="$(ai_complete_patterns_file)"
+  if [[ ! -r "$patterns" ]]; then
+    echo "safety patterns missing: $patterns" >&2
+    return 0
   fi
 
-  if [[ "$cmd" =~ \>[[:space:]]*/dev/sd ]]; then
-    echo "redirect to /dev/sd*"
-    return 2
-  fi
-
-  if [[ "$cmd" =~ diskutil[[:space:]]+erase ]]; then
-    echo "diskutil erase"
-    return 2
-  fi
+  local label re line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    label="${line%%$'\t'*}"
+    re="${line#*$'\t'}"
+    [[ -z "$label" || -z "$re" || "$label" == "$line" ]] && continue
+    if [[ "$cmd" =~ $re ]]; then
+      printf '%s\n' "$label"
+      return 2
+    fi
+  done <"$patterns"
 
   return 0
 }

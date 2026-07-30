@@ -1,0 +1,143 @@
+# zsh-ai-complete — curated dangerous-command patterns (bash ERE for [[ =~ ]])
+#
+# Format: label<TAB>regex
+# Lines starting with # and blank lines are ignored.
+#
+# These patterns are adapted for bash Extended Regular Expressions (no JS lookbehind).
+# Catalog inspiration and categories drawn from hardstop-patterns (MIT):
+#   https://github.com/frmoretto/hardstop-patterns
+# Related tooling (not vendored): https://github.com/frmoretto/hardstop
+# See NOTICE for attribution.
+#
+# Scope: warn-only seatbelt for AI-suggested shell commands on macOS and Linux
+# zsh — not a full agent firewall. Prefer false negatives over noisy false positives.
+
+# --- deletion / wipe ---
+rm -rf on /	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+/([[:space:]]|$)
+rm -rf on /*	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+/\*([[:space:]]|$)
+rm -rf on home	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(~(/|[[:space:]]|$)|\$HOME|\$\{HOME\})
+rm -rf broad glob	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(\*|\.\*|\./\*)([[:space:]]|$)
+rm -rf on cwd	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(\.|\./)([[:space:]]|$)
+sudo rm destructive	sudo[[:space:]]+.*rm[[:space:]]+(-[a-zA-Z]*r|-[a-zA-Z]*f|-r|-f)
+
+# --- find delete (broader) ---
+find -delete on / or home	find[[:space:]]+/([[:space:]]|$).*-delete|find[[:space:]]+~.*-delete|find[[:space:]]+.*\$HOME.*-delete|find[[:space:]]+.*\$\{HOME\}.*-delete
+find -exec rm	find[[:space:]].*-exec[[:space:]]+rm[[:space:]]
+find -delete anywhere	find[[:space:]].*-delete
+xargs rm -rf	xargs[[:space:]].*rm[[:space:]]+(-[a-zA-Z]*r|-[a-zA-Z]*f|-rf|-fr)
+
+# --- disk / filesystem (macOS + Linux) ---
+dd if=	(^|[[:space:]])dd[[:space:]].*if=
+mkfs	(^|[[:space:]])mkfs([.]|[[:space:]])
+redirect to raw disk	\>[[:space:]]*/dev/(sd|hd|vd|nvme|disk)
+diskutil erase	diskutil[[:space:]]+(erase|secureErase|partitionDisk|reformat)
+shred wipe	(^|[[:space:]])shred[[:space:]]
+wipefs	(^|[[:space:]])wipefs[[:space:]]
+parted destructive	parted[[:space:]].*(mklabel|mkpart|rm[[:space:]])|(^|[[:space:]])parted[[:space:]].*---pretend-input-tty
+fdisk destructive	(^|[[:space:]])(fdisk|sfdisk|cfdisk|gdisk|sgdisk)[[:space:]].*/dev/
+lvremove / vgremove	(^|[[:space:]])(lvremove|vgremove|pvremove)[[:space:]]
+mdadm stop/zero	mdadm[[:space:]].*(--stop|--zero-superblock|--fail)
+
+# --- git ---
+git force-push to main/master	git[[:space:]]+push[[:space:]]+-f[[:space:]]+[^[:space:]]+[[:space:]]+(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]]+--force[[:space:]].*(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]].*(main|master)[[:space:]].*(--force|-f)([[:space:]]|$)
+git reset --hard	git[[:space:]]+reset[[:space:]]+--hard
+git clean -fdx	git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*d[a-zA-Z]*x|git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*x[a-zA-Z]*d|git[[:space:]]+clean[[:space:]]+-fdx
+git push --mirror	git[[:space:]]+push[[:space:]]+--mirror
+git branch -D main/master	git[[:space:]]+branch[[:space:]]+-D[[:space:]]+(main|master)([[:space:]]|$)
+
+# --- permissions / system ---
+chmod 777	chmod[[:space:]]+(-R[[:space:]]+)?777([[:space:]]|$)
+chmod -R on /	chmod[[:space:]]+-R[[:space:]]+.*/([[:space:]]|$)
+chown -R on /	chown[[:space:]]+-R[[:space:]]+.*/([[:space:]]|$)
+
+# --- remote code / pipes ---
+curl|bash / wget|sh	(curl|wget)[[:space:]].*\|[[:space:]]*(ba)?sh
+bash -c with rm	(ba)?sh[[:space:]]+-c[[:space:]]+.*rm[[:space:]]
+
+# --- credential / secret reads (hardstop CREAD-* inspired) ---
+read SSH private key	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp|scp|rsync|gzip|tar|zip)[[:space:]].*/\.ssh/id_
+read AWS credentials	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]].*/\.aws/credentials
+read kubeconfig secrets	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]].*/\.kube/config
+read npm token file	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]].*/\.npmrc
+read docker config auth	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]].*/\.docker/config\.json
+read /etc/shadow	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]]+/etc/shadow
+read /etc/gshadow	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]]+/etc/gshadow
+read env secrets file	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]].*/\.env([[:space:]]|$)|(^|[[:space:];|&])(cat|less|more|bat)[[:space:]].*\.env\.local
+read GPG private keyring	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp|gpg)[[:space:]].*/\.gnupg/(private-keys|secring)
+read systemd credentials	(^|[[:space:];|&])(cat|less|more|bat|head|tail|cp)[[:space:]]+/etc/credstore
+
+# --- macOS security / backups / accounts ---
+csrutil disable	csrutil[[:space:]]+disable
+spctl gatekeeper off	spctl[[:space:]]+--master-disable
+tmutil delete backups	tmutil[[:space:]]+(delete|deletelocalsnapshots|thinlocalsnapshots|removeinheritance)
+security delete-keychain	security[[:space:]]+delete-keychain
+security dump-keychain	security[[:space:]]+dump-keychain
+security find password dump	security[[:space:]]+find-(generic|internet)-password[[:space:]].*-g|security[[:space:]]+export-keychain
+launchctl unload system	launchctl[[:space:]]+(unload|bootout|disable)[[:space:]]+(system|gui)/|launchctl[[:space:]]+(unload|bootout)[[:space:]]+.*(/System/|/Library/LaunchDaemons)
+dscl delete user	dscl[[:space:]].*-delete[[:space:]]+/Users/
+
+# --- Linux equivalents (security / services / accounts / backups) ---
+SELinux permissive	setenforce[[:space:]]+0|setenforce[[:space:]]+Permissive
+AppArmor disable	(^|[[:space:]])(aa-disable|aa-teardown)[[:space:]]|systemctl[[:space:]]+(stop|disable|mask)[[:space:]]+apparmor
+firewall flush/disable	ufw[[:space:]]+disable|firewall-cmd[[:space:]]+--panic-on|iptables[[:space:]]+(-F|--flush)|nft[[:space:]]+flush[[:space:]]+ruleset|systemctl[[:space:]]+(stop|disable|mask)[[:space:]]+(firewalld|ufw|nftables)
+systemctl mask critical	systemctl[[:space:]]+mask[[:space:]]+(ssh|sshd|systemd-journald|NetworkManager|dbus)
+systemctl stop sshd	systemctl[[:space:]]+(stop|disable)[[:space:]]+(ssh|sshd)([[:space:]]|$)
+userdel remove home	userdel[[:space:]]+-r|deluser[[:space:]].*--remove-home
+passwd lock root	passwd[[:space:]]+(-l|--lock)[[:space:]]+root
+timeshift/snapper wipe	timeshift[[:space:]]+--delete|snapper[[:space:]]+delete|btrfs[[:space:]]+subvolume[[:space:]]+delete
+secret-tool clear	secret-tool[[:space:]]+clear
+kwallet remove	kwallet-query[[:space:]].*--delete-folder|kwalletd[[:space:]].*--replace
+chattr clear immutable on /	chattr[[:space:]]+-[a-zA-Z]*i[[:space:]]+/|chattr[[:space:]]+-i[[:space:]]+/
+update-rc.d remove ssh	update-rc.d[[:space:]]+(ssh|sshd|networking)[[:space:]]+remove
+
+# --- cloud / containers / infra ---
+aws s3 recursive delete	aws[[:space:]]+s3[[:space:]]+(rm|rb)[[:space:]].*(--recursive|--force)|aws[[:space:]]+s3[[:space:]]+rb[[:space:]].*--force
+aws ec2 terminate	aws[[:space:]]+ec2[[:space:]]+terminate-instances
+aws rds delete	aws[[:space:]]+rds[[:space:]]+delete-db-instance
+aws cloudformation delete	aws[[:space:]]+cloudformation[[:space:]]+delete-stack
+gcloud project delete	gcloud[[:space:]]+projects[[:space:]]+delete
+gcloud sql delete	gcloud[[:space:]]+sql[[:space:]]+instances[[:space:]]+delete
+gh repo delete	gh[[:space:]]+repo[[:space:]]+delete
+docker system prune -a	docker[[:space:]]+system[[:space:]]+prune[[:space:]]+.*-a|docker[[:space:]]+system[[:space:]]+prune[[:space:]]+--all
+docker volume prune	docker[[:space:]]+volume[[:space:]]+prune
+terraform destroy	terraform[[:space:]]+destroy
+pulumi destroy	pulumi[[:space:]]+destroy
+helm uninstall	helm[[:space:]]+(uninstall|delete)
+
+# --- kubectl ---
+kubectl delete namespace	kubectl[[:space:]]+delete[[:space:]]+(ns|namespace)
+kubectl delete all	kubectl[[:space:]]+delete[[:space:]]+.*--all([[:space:]]|$)|kubectl[[:space:]]+delete[[:space:]]+all[[:space:]]
+kubectl delete -A	kubectl[[:space:]]+delete[[:space:]].*(-A|--all-namespaces)
+kubectl drain node	kubectl[[:space:]]+drain[[:space:]]
+kubectl delete node	kubectl[[:space:]]+delete[[:space:]]+node[[:space:]]
+kubectl delete pv/pvc	kubectl[[:space:]]+delete[[:space:]]+(pv|persistentvolume|pvc|persistentvolumeclaim)[[:space:]]
+kubectl delete crd	kubectl[[:space:]]+delete[[:space:]]+(crd|customresourcedefinition)[[:space:]]
+kubectl delete clusterrole	kubectl[[:space:]]+delete[[:space:]]+(clusterrole|clusterrolebinding)[[:space:]]
+kubectl replace --force	kubectl[[:space:]]+replace[[:space:]]+.*--force
+kubectl apply prune	kubectl[[:space:]]+apply[[:space:]].*--prune
+kubectl exec destructive	kubectl[[:space:]]+exec[[:space:]].*--[[:space:]].*(rm[[:space:]]|mkfs|dd[[:space:]]|shutdown|reboot|wipefs)
+kubectl cp from secrets	kubectl[[:space:]]+cp[[:space:]].*/(secret|secrets)/
+
+# --- glab (GitLab CLI) — verified against docs.gitlab.com/cli ---
+glab repo delete	glab[[:space:]]+repo[[:space:]]+delete
+glab api delete	glab[[:space:]]+api[[:space:]].*(-X[[:space:]]+DELETE|--method[[:space:]]+DELETE)
+glab variable delete	glab[[:space:]]+variable[[:space:]]+(delete|remove)
+glab mr delete	glab[[:space:]]+mr[[:space:]]+delete
+glab issue delete	glab[[:space:]]+issue[[:space:]]+delete
+glab release delete	glab[[:space:]]+release[[:space:]]+delete
+glab schedule delete	glab[[:space:]]+schedule[[:space:]]+delete
+glab runner delete	glab[[:space:]]+runner[[:space:]]+delete
+glab agent token revoke	glab[[:space:]]+cluster[[:space:]]+agent[[:space:]]+token[[:space:]]+revoke
+glab agent token-cache clear	glab[[:space:]]+cluster[[:space:]]+agent[[:space:]]+token-cache[[:space:]]+clear
+
+# --- argocd CLI — verified against argo-cd.readthedocs.io command reference ---
+argocd app delete	argocd[[:space:]]+app[[:space:]]+delete
+argocd appset delete	argocd[[:space:]]+appset[[:space:]]+delete
+argocd proj delete	argocd[[:space:]]+proj[[:space:]]+delete
+argocd repo rm	argocd[[:space:]]+repo[[:space:]]+rm[[:space:]]
+argocd cluster rm	argocd[[:space:]]+cluster[[:space:]]+rm[[:space:]]
+argocd account delete-token	argocd[[:space:]]+account[[:space:]]+delete-token
+argocd cert rm	argocd[[:space:]]+cert[[:space:]]+rm[[:space:]]
+argocd gpg rm	argocd[[:space:]]+gpg[[:space:]]+rm[[:space:]]
+argocd app sync prune	argocd[[:space:]]+app[[:space:]]+sync[[:space:]].*--prune
+argocd app rollback	argocd[[:space:]]+app[[:space:]]+rollback

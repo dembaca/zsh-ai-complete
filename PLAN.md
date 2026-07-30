@@ -76,6 +76,10 @@ zsh-ai-complete/
 ### M5 — Install/Docs
 - [x] `install.sh`, `config/default.env`, README
 
+### Experiment — Ghost text (`experiment/ghost-text`)
+- [x] `AI_COMPLETE_MODE=ghost`: POSTDISPLAY preview; Tab/→/Enter accept; Ctrl+X u / Ctrl+G / tippen verwerfen
+- Fallback: `AI_COMPLETE_MODE=replace` oder Branch `main`
+
 ## Abnahmekriterien v1
 
 - Freitext → Ctrl+X Ctrl+X → Kommando im Buffer, kein Auto-Execute
