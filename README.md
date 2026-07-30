@@ -2,8 +2,6 @@
 
 Local LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X**, and the suggested command appears as **ghost text** (preview) — never auto-executed.
 
-> Branch `experiment/ghost-text`. Dislike it? `git checkout main` and reload the shell — or set `AI_COMPLETE_MODE=replace` in config.
-
 Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`).
 
 ## Requirements
@@ -28,9 +26,9 @@ AI_COMPLETE_API_KEY=your-omlx-api-key
 
 Reload the shell (`source ~/.zshrc` or open a new tab).
 
-## Usage (ghost mode)
+## Usage
 
-1. Type a free-text intent, e.g. `finde alle pdfs im aktuellen verzeichnis`
+1. Type a free-text intent, e.g. `find all pdfs in the current directory`
 2. Press **Ctrl+X** twice → suggestion shows as dim ghost text (`!!! …` + reverse video if safety warn)
 3. **Accept** (into the buffer, still not run): **Tab**, **→**, **Enter**, or **Ctrl+X Ctrl+X** again
 4. Press **Enter** again to run — or discard first
@@ -39,7 +37,7 @@ Reload the shell (`source ~/.zshrc` or open a new tab).
 
 Also bound (if Option sends Esc+): **⌥+Enter**.
 
-Fallback without ghost: set `AI_COMPLETE_MODE=replace` in `config.env`.
+To skip the preview and replace the buffer directly, set `AI_COMPLETE_MODE=replace` in `config.env`.
 
 Successful intents are appended to zsh history as `# …` (safe comment if `interactivecomments` is on — the plugin enables it).
 
@@ -55,7 +53,7 @@ Successful intents are appended to zsh history as `# …` (safe comment if `inte
 
 ```bash
 export AI_COMPLETE_MODEL=your-model-id
-./bin/ai-complete "finde alle pdfs im aktuellen Verzeichnis"
+./bin/ai-complete "find all pdfs in the current directory"
 ```
 
 Exit codes: `0` clean, `2` success with safety warning (command still on stdout), `1` error.
@@ -71,7 +69,7 @@ Environment / `~/.config/zsh-ai-complete/config.env`:
 | `AI_COMPLETE_API_KEY`  | *(optional)*                    | Bearer token when oMLX auth is on          |
 | `AI_COMPLETE_TIMEOUT`  | `30`                            | Seconds                                    |
 | `AI_COMPLETE_HISTORY`  | `8`                             | Recent history lines sent as context       |
-| `AI_COMPLETE_MODE`     | `ghost`                         | `ghost` (preview) or `replace` (old behavior) |
+| `AI_COMPLETE_MODE`     | `ghost`                         | `ghost` (preview) or `replace` (direct buffer swap) |
 | `AI_COMPLETE_SAVE_PROMPTS` | `1`                         | Write `# …` intents into zsh history       |
 | `AI_COMPLETE_ENABLED`  | `1`                             | `0` disables the widget                    |
 
@@ -98,6 +96,6 @@ config/default.env              # install template
 install.sh
 ```
 
-## Not in scope (yet)
+## Disclaimer
 
-Full hardstop/dcg runtime, response cache, Anthropic `/v1/messages`, streaming, daemon lifecycle.
+Substantial parts of this project were generated or edited with AI coding assistants. Treat it like any other third-party shell tooling: review the code before installing, especially the ZLE plugin and safety patterns. No warranty — use at your own risk.
