@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# ai-complete — resolve free-text intent to a shell command via local oMLX.
+#
+# Usage: ai-complete [--] <prompt...>
+#
+# stdout: command only
+# stderr: diagnostics / safety warning label
+# exit 0: ok (clean)
+# exit 2: ok with safety warning (command still on stdout)
+# exit 1: error
+
+set -euo pipefail
+
+AI_COMPLETE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../lib/context.sh
+source "$AI_COMPLETE_ROOT/lib/context.sh"
+# shellcheck source=../lib/safety.sh
+source "$AI_COMPLETE_ROOT/lib/safety.sh"
+
+AI_COMPLETE_ENDPOINT="${AI_COMPLETE_ENDPOINT:-http://127.0.0.1:8000/v1}"
+AI_COMPLETE_TIMEOUT="${AI_COMPLETE_TIMEOUT:-30}"
+
+usage() {
+  cat <<'EOF'
+Usage: ai-complete [--] <prompt...>
+
+Requires AI_COMPLETE_MODEL. Optional:
+  AI_COMPLETE_ENDPOINT  (default http://127.0.0.1:8000/v1)
+  AI_COMPLETE_API_KEY   (Bearer token if oMLX auth is enabled)
+  AI_COMPLETE_TIMEOUT   (default 30)
+  AI_COMPLETE_HISTORY   (default 8)
+EOF
+}
+
+ai_complete_sanitize() {
+  local text="$1"
+  # Strip markdown fences if the model ignored instructions
+  text="$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if [[ "$text" == \`\`\`* ]]; then
+    text="$(printf '%s\n' "$text" | sed -e '1{/^```/d;}' -e '${/^```$/d;}')"
+    text="$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  fi
+  # Drop a leading language tag line like ```bash already handled; also "bash\ncmd"
+  if [[ "$text" == bash$'\n'* || "$text" == sh$'\n'* || "$text" == zsh$'\n'* ]]; then
+    text="${text#*$'\n'}"
+  fi
+  printf '%s' "$text"
+}
+
+ai_complete_system_prompt() {
+  cat <<'EOF'
+You convert natural-language intents into a single shell command for macOS zsh.
+Reply with ONLY the command — no explanation, no markdown, no code fences, no quotes around the whole command.
+Prefer portable macOS/BSD flags when relevant. Use the provided context (cwd, git, history) when useful.
+If the intent is ambiguous, choose the most common safe interpretation.
+EOF
+}
+
+main() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    usage
+    exit 0
+  fi
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+
+  if [[ $# -lt 1 ]]; then
+    echo "ai-complete: missing prompt" >&2
+    usage >&2
+    exit 1
+  fi
+
+  if [[ -z "${AI_COMPLETE_MODEL:-}" ]]; then
+    echo "ai-complete: AI_COMPLETE_MODEL is required (no silent default)" >&2
+    exit 1
+  fi
+
+  local prompt="$*"
+  local context
+  context="$(ai_complete_collect_context)"
+
+  local user_content
+  user_content="$(cat <<EOF
+Context:
+$context
+
+Intent:
+$prompt
+EOF
+)"
+
+  local payload
+  payload="$(jq -n \
+    --arg model "$AI_COMPLETE_MODEL" \
+    --arg system "$(ai_complete_system_prompt)" \
+    --arg user "$user_content" \
+    '{
+      model: $model,
+      temperature: 0.1,
+      max_tokens: 256,
+      messages: [
+        {role: "system", content: $system},
+        {role: "user", content: $user}
+      ]
+    }')"
+
+  local url="${AI_COMPLETE_ENDPOINT%/}/chat/completions"
+  local http_code
+  local tmp
+  tmp="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$tmp' '${tmp}.err'" EXIT
+
+  local -a curl_headers=(-H 'Content-Type: application/json')
+  if [[ -n "${AI_COMPLETE_API_KEY:-}" ]]; then
+    curl_headers+=(-H "Authorization: Bearer ${AI_COMPLETE_API_KEY}")
+  fi
+
+  http_code="$(curl -sS -o "$tmp" -w '%{http_code}' \
+    --max-time "$AI_COMPLETE_TIMEOUT" \
+    "${curl_headers[@]}" \
+    -d "$payload" \
+    "$url" 2>"${tmp}.err" || true)"
+
+  if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+    local err
+    err="$(cat "${tmp}.err" 2>/dev/null || true)"
+    echo "ai-complete: request failed (HTTP ${http_code:-0}) to $url" >&2
+    if [[ -s "$tmp" ]]; then
+      echo "ai-complete: $(head -c 500 "$tmp")" >&2
+    fi
+    if [[ -n "$err" ]]; then
+      echo "ai-complete: $err" >&2
+    fi
+    rm -f "${tmp}.err"
+    exit 1
+  fi
+  rm -f "${tmp}.err"
+
+  local raw
+  raw="$(jq -er '.choices[0].message.content // empty' "$tmp" 2>/dev/null || true)"
+  if [[ -z "$raw" ]]; then
+    echo "ai-complete: empty model response" >&2
+    exit 1
+  fi
+
+  local cmd
+  cmd="$(ai_complete_sanitize "$raw")"
+  if [[ -z "$cmd" ]]; then
+    echo "ai-complete: sanitized response empty" >&2
+    exit 1
+  fi
+
+  local warn_label=""
+  set +e
+  warn_label="$(ai_complete_safety_check "$cmd")"
+  local safety_rc=$?
+  set -e
+
+  printf '%s\n' "$cmd"
+
+  if [[ $safety_rc -eq 2 ]]; then
+    echo "ai-complete: warning: $warn_label" >&2
+    exit 2
+  fi
+
+  exit 0
+}
+
+main "$@"
