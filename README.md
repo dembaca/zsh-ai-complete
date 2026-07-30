@@ -2,6 +2,8 @@
 
 Local LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X**, and the suggested command appears as **ghost text** (preview) — never auto-executed.
 
+![Demo of zsh-ai-complete](demo.gif)
+
 Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`).
 
 ## Requirements

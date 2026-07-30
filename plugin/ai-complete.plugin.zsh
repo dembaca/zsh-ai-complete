@@ -313,16 +313,16 @@ ai-complete-accept-line() {
     ai-complete-accept-widget
     return 0
   fi
-  zle .accept-line
+  _ai_complete_call_orig accept-line
 }
 
-# Tab: accept ghost, else normal completion
+# Tab: accept ghost, else whatever completion was bound before (fzf-tab, menu, …)
 ai-complete-expand-or-complete() {
   if (( _AI_COMPLETE_PENDING )); then
     ai-complete-accept-widget
     return 0
   fi
-  zle .expand-or-complete
+  _ai_complete_call_orig expand-or-complete
 }
 
 # → : accept ghost when pending, else move forward
@@ -331,7 +331,7 @@ ai-complete-forward-char() {
     ai-complete-accept-widget
     return 0
   fi
-  zle .forward-char
+  _ai_complete_call_orig forward-char
 }
 
 # Typing discards ghost and restores free text, then inserts the character
@@ -344,7 +344,7 @@ ai-complete-self-insert() {
     CURSOR=$prior_c
     _AI_COMPLETE_CAN_UNDO=0
   fi
-  zle .self-insert
+  _ai_complete_call_orig self-insert
 }
 
 # Backspace discards ghost
@@ -353,7 +353,7 @@ ai-complete-backward-delete-char() {
     ai-complete-discard-widget
     return 0
   fi
-  zle .backward-delete-char
+  _ai_complete_call_orig backward-delete-char
 }
 
 # Ctrl+G: discard ghost, else default break
@@ -362,19 +362,72 @@ ai-complete-send-break() {
     ai-complete-discard-widget
     return 0
   fi
-  zle .send-break
+  _ai_complete_call_orig send-break
+}
+
+# Preserve the previous user/builtin widget so we don't clobber fzf-tab etc.
+# Other plugins often call `zle backward-delete-char` by name; without a
+# reentrancy guard that re-enters our wrapper and blows FUNCNEST.
+typeset -g _AI_COMPLETE_IN_ORIG=0
+
+_ai_complete_call_orig() {
+  local w="$1"
+  shift
+  local saved="_ai_complete_orig_${w}"
+
+  if (( _AI_COMPLETE_IN_ORIG )); then
+    zle ".$w" "$@"
+    return
+  fi
+
+  if (( ${+widgets[$saved]} )) && [[ ${widgets[$saved]} != user:ai-complete-* ]]; then
+    _AI_COMPLETE_IN_ORIG=1
+    {
+      zle "$saved" "$@"
+    } always {
+      _AI_COMPLETE_IN_ORIG=0
+    }
+  else
+    zle ".$w" "$@"
+  fi
+}
+
+_ai_complete_wrap() {
+  local w="$1" wrapper="$2"
+  local saved="_ai_complete_orig_${w}"
+
+  # Repair self-alias from an earlier reload (orig → our wrapper → FUNCNEST)
+  if [[ ${widgets[$saved]:-} == user:ai-complete-* ]]; then
+    zle -D "$saved" 2>/dev/null || true
+  fi
+
+  if [[ ${widgets[$w]:-} == "user:$wrapper" ]]; then
+    zle -N "$w" "$wrapper"
+    return 0
+  fi
+
+  # Capture the previous implementation only once per shell
+  if (( ! ${+widgets[$saved]} )) && [[ -n ${widgets[$w]:-} ]]; then
+    zle -A "$w" "$saved"
+    if [[ ${widgets[$saved]:-} == user:ai-complete-* ]]; then
+      zle -D "$saved" 2>/dev/null || true
+    fi
+  fi
+
+  zle -N "$w" "$wrapper"
 }
 
 zle -N ai-complete-widget
 zle -N ai-complete-accept-widget
 zle -N ai-complete-discard-widget
 zle -N ai-complete-undo-widget ai-complete-discard-widget
-zle -N accept-line ai-complete-accept-line
-zle -N expand-or-complete ai-complete-expand-or-complete
-zle -N forward-char ai-complete-forward-char
-zle -N self-insert ai-complete-self-insert
-zle -N backward-delete-char ai-complete-backward-delete-char
-zle -N send-break ai-complete-send-break
+
+_ai_complete_wrap accept-line ai-complete-accept-line
+_ai_complete_wrap expand-or-complete ai-complete-expand-or-complete
+_ai_complete_wrap forward-char ai-complete-forward-char
+_ai_complete_wrap self-insert ai-complete-self-insert
+_ai_complete_wrap backward-delete-char ai-complete-backward-delete-char
+_ai_complete_wrap send-break ai-complete-send-break
 
 # Primary: Ctrl+X Ctrl+X
 bindkey '^X^X' ai-complete-widget
@@ -382,9 +435,9 @@ bindkey '^X^X' ai-complete-widget
 bindkey '^Xu' ai-complete-discard-widget
 bindkey '^X^U' ai-complete-discard-widget
 bindkey '^G' ai-complete-send-break
-# Arrow right (common sequences)
-bindkey '^[[C' ai-complete-forward-char
-bindkey '^[OC' ai-complete-forward-char
+# Arrow right (common sequences) — keep invoking the (wrapped) forward-char name
+bindkey '^[[C' forward-char
+bindkey '^[OC' forward-char
 # Optional: ⌥+Enter
 bindkey '\e\r' ai-complete-widget
 bindkey '^[^M' ai-complete-widget
