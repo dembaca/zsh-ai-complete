@@ -422,6 +422,15 @@ zle -N ai-complete-accept-widget
 zle -N ai-complete-discard-widget
 zle -N ai-complete-undo-widget ai-complete-discard-widget
 
+# Register wrapper functions under their own widget names too. Leftover
+# bindkeys (or other plugins) may still call `ai-complete-forward-char` etc.
+zle -N ai-complete-accept-line
+zle -N ai-complete-expand-or-complete
+zle -N ai-complete-forward-char
+zle -N ai-complete-self-insert
+zle -N ai-complete-backward-delete-char
+zle -N ai-complete-send-break
+
 _ai_complete_wrap accept-line ai-complete-accept-line
 _ai_complete_wrap expand-or-complete ai-complete-expand-or-complete
 _ai_complete_wrap forward-char ai-complete-forward-char
@@ -434,8 +443,8 @@ bindkey '^X^X' ai-complete-widget
 # Discard / restore (Ctrl+X u or Ctrl+G)
 bindkey '^Xu' ai-complete-discard-widget
 bindkey '^X^U' ai-complete-discard-widget
-bindkey '^G' ai-complete-send-break
-# Arrow right (common sequences) — keep invoking the (wrapped) forward-char name
+bindkey '^G' send-break
+# Arrow right — bind both common sequences to the wrapped forward-char
 bindkey '^[[C' forward-char
 bindkey '^[OC' forward-char
 # Optional: ⌥+Enter
