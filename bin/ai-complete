@@ -107,14 +107,20 @@ EOF
 
   local url="${AI_COMPLETE_ENDPOINT%/}/chat/completions"
   local http_code
-  local tmp
+  local tmp auth_tmp
   tmp="$(mktemp)"
-  # shellcheck disable=SC2064
-  trap "rm -f '$tmp' '${tmp}.err'" EXIT
+  auth_tmp=""
+  _ai_complete_cleanup() { rm -f "$tmp" "${tmp}.err" "${auth_tmp}"; }
+  trap _ai_complete_cleanup EXIT
 
   local -a curl_headers=(-H 'Content-Type: application/json')
   if [[ -n "${AI_COMPLETE_API_KEY:-}" ]]; then
-    curl_headers+=(-H "Authorization: Bearer ${AI_COMPLETE_API_KEY}")
+    # Write the auth header to a private temp file to keep the key out of
+    # the process list (ps aux shows curl arguments to all local users).
+    auth_tmp="$(mktemp)"
+    chmod 600 "$auth_tmp"
+    printf 'Authorization: Bearer %s\r\n' "${AI_COMPLETE_API_KEY}" > "$auth_tmp"
+    curl_headers+=(--header "@${auth_tmp}")
   fi
 
   http_code="$(curl -sS -o "$tmp" -w '%{http_code}' \

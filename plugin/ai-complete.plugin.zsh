@@ -44,6 +44,9 @@ if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/zsh-ai-complete/config.env" ]]; then
   # shellcheck disable=SC1090
   source "${XDG_CONFIG_HOME:-$HOME/.config}/zsh-ai-complete/config.env"
   set +a
+  # Revoke the export flag from credential variables — set -a would otherwise
+  # leave them exported into every child process for the session lifetime.
+  typeset +x AI_COMPLETE_API_KEY 2>/dev/null || true
 fi
 
 # So "# …" history entries are harmless if executed
@@ -211,8 +214,6 @@ ai-complete-widget() {
   local intent="$BUFFER"
   local last_status="${AI_COMPLETE_SAVED_STATUS:-0}"
   local last_cmd="${AI_COMPLETE_SAVED_CMD:-}"
-  # Drop foreign ghost text (e.g. zsh-autosuggestions) so it cannot leak into history
-  POSTDISPLAY=
 
   if [[ "$AI_COMPLETE_ENABLED" != "1" ]]; then
     zle -M "ai-complete: disabled (ai-enable to turn on)"
@@ -233,6 +234,10 @@ ai-complete-widget() {
     zle -M "ai-complete: missing executable $AI_COMPLETE_BIN"
     return 0
   fi
+
+  # Drop foreign ghost text (e.g. zsh-autosuggestions) only once we're committed
+  # to running — avoids clearing autosuggestions on no-op early returns above.
+  POSTDISPLAY=
 
   zle -M "ai-complete: thinking…"
   zle -R

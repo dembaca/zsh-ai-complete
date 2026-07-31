@@ -23,12 +23,9 @@ ai_complete_patterns_file() {
 ai_complete_safety_check() {
   local cmd="${1:-}"
 
-  # Fork bomb — bare & breaks some [[ =~ ]] parses; keep as string match
-  if [[ "$cmd" == *':()'* && "$cmd" == *'|:&'* ]]; then
-    echo "fork bomb"
-    return 2
-  fi
-  if [[ "$cmd" == *':()'* && "$cmd" == *':|:'* && "$cmd" == *'};:'* ]]; then
+  # Fork bomb — any function whose body recursively pipes to itself in background.
+  # ERE handles canonical :(){ :|:& };: and spaced/named variants like f(){ f|f& };f
+  if [[ "$cmd" =~ [[:alnum:]_:]+[[:space:]]*\(\)[[:space:]]*\{[^}]*\|[^}]*\& ]]; then
     echo "fork bomb"
     return 2
   fi
