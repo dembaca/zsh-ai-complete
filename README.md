@@ -79,6 +79,8 @@ Environment / `~/.config/zsh-ai-complete/config.env`:
 
 `lib/safety.sh` loads curated bash-ERE patterns from [`lib/dangerous.patterns`](lib/dangerous.patterns) and **warns** (still inserts) on matches such as broad `rm -rf`, `dd`/`mkfs`/`diskutil`, force-push to main, `curl|bash`, macOS wipe helpers, etc.
 
+**These patterns are not a security system.** Any determined attacker — or a sufficiently creative model — can trivially bypass them (e.g. `echo "cm0gLXJmIH4K" | base64 -d | sh`). The sole intent is to protect you from yourself: an extra visual jolt before you accept something destructive when you're tired, distracted, or on your third coffee. You always see the command before it runs. You are the last line of defence.
+
 Patterns are a curated subset rewritten for bash `[[ =~ ]]`, inspired by **[hardstop-patterns](https://github.com/frmoretto/hardstop-patterns)** (MIT). Attribution: [`NOTICE`](NOTICE). Related: [hardstop](https://github.com/frmoretto/hardstop). Override path with `AI_COMPLETE_PATTERNS_FILE`.
 
 ```bash
