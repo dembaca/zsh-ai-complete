@@ -1,16 +1,16 @@
 # zsh-ai-complete
 
-Local LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X**, and the suggested command appears as **ghost text** (preview) — never auto-executed.
+LLM-powered shell completion for zsh. Type what you want in plain language, press **Ctrl+X Ctrl+X** (memorize: ["Hex-Hex"](https://www.youtube.com/watch?v=_klGQkeE7sk)), and the suggested command appears as **ghost text** (preview) — never auto-executed.
 
 ![Demo of zsh-ai-complete](demo.gif)
 
-Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`).
+Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`) on my Apple Silicon. Use whatever you have.
 
 ## Requirements
 
 - zsh
 - `curl` and `jq`
-- oMLX (or any OpenAI-compatible server) on `http://127.0.0.1:8000/v1`
+- OpenAI-compatible server, e.g. an oMLX on `http://127.0.0.1:8000/v1`
 
 ## Install
 
@@ -23,7 +23,7 @@ Then edit `~/.config/zsh-ai-complete/config.env`:
 ```bash
 AI_COMPLETE_MODEL=your-model-id
 # If oMLX requires auth (default after setup):
-AI_COMPLETE_API_KEY=your-omlx-api-key
+AI_COMPLETE_API_KEY=your-api-key
 ```
 
 Reload the shell (`source ~/.zshrc` or open a new tab).
@@ -68,7 +68,7 @@ Environment / `~/.config/zsh-ai-complete/config.env`:
 |------------------------|---------------------------------|--------------------------------------------|
 | `AI_COMPLETE_MODEL`    | *(required)*                    | No silent default — must be set            |
 | `AI_COMPLETE_ENDPOINT` | `http://127.0.0.1:8000/v1`      | OpenAI base URL (client appends `/chat/completions`) |
-| `AI_COMPLETE_API_KEY`  | *(optional)*                    | Bearer token when oMLX auth is on          |
+| `AI_COMPLETE_API_KEY`  | *(optional)*                    | Bearer token when auth is on               |
 | `AI_COMPLETE_TIMEOUT`  | `30`                            | Seconds                                    |
 | `AI_COMPLETE_HISTORY`  | `8`                             | Recent history lines sent as context       |
 | `AI_COMPLETE_MODE`     | `ghost`                         | `ghost` (preview) or `replace` (direct buffer swap) |
