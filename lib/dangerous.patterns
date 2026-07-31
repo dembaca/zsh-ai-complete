@@ -13,11 +13,12 @@
 # zsh — not a full agent firewall. Prefer false negatives over noisy false positives.
 
 # --- deletion / wipe ---
-rm -rf on /	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+/([[:space:]]|$)
-rm -rf on /*	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+/\*([[:space:]]|$)
-rm -rf on home	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(~(/|[[:space:]]|$)|\$HOME|\$\{HOME\})
-rm -rf broad glob	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(\*|\.\*|\./\*)([[:space:]]|$)
-rm -rf on cwd	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(\.|\./)([[:space:]]|$)
+rm -rf on /	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(--[[:space:]]+)?/([[:space:]]|$)
+rm -rf on /*	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(--[[:space:]]+)?/\*([[:space:]]|$)
+rm -rf on home	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(--[[:space:]]+)?(~(/|[[:space:]]|$)|\$HOME|\$\{HOME\})
+rm -rf broad glob	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(--[[:space:]]+)?(\*|\.\*|\./\*)([[:space:]]|$)
+rm -rf on cwd	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-rf|-fr)[[:space:]]+(--[[:space:]]+)?(\.|\./)([[:space:]]|$)
+rm split-flag destructive	rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*)[[:space:]]+(--[[:space:]]+)?(/([[:space:]]|$)|/\*([[:space:]]|$)|~(/|[[:space:]]|$)|\$HOME|\$\{HOME\}|(\*|\.\*|\./\*)([[:space:]]|$)|(\.|\./)([[:space:]]|$))
 sudo rm destructive	sudo[[:space:]]+.*rm[[:space:]]+(-[a-zA-Z]*r|-[a-zA-Z]*f|-r|-f)
 
 # --- find delete (broader) ---
@@ -39,19 +40,19 @@ lvremove / vgremove	(^|[[:space:]])(lvremove|vgremove|pvremove)[[:space:]]
 mdadm stop/zero	mdadm[[:space:]].*(--stop|--zero-superblock|--fail)
 
 # --- git ---
-git force-push to main/master	git[[:space:]]+push[[:space:]]+-f[[:space:]]+[^[:space:]]+[[:space:]]+(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]]+--force[[:space:]].*(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]].*(main|master)[[:space:]].*(--force|-f)([[:space:]]|$)
+git force-push to main/master	git[[:space:]]+push[[:space:]]+-f[[:space:]]+[^[:space:]]+[[:space:]]+(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]]+--force[[:space:]].*(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]]+--force-with-lease[[:space:]].*(main|master)([[:space:]]|$)|git[[:space:]]+push[[:space:]].*(main|master)[[:space:]].*(--force|--force-with-lease|-f)([[:space:]]|$)
 git reset --hard	git[[:space:]]+reset[[:space:]]+--hard
 git clean -fdx	git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*d[a-zA-Z]*x|git[[:space:]]+clean[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*x[a-zA-Z]*d|git[[:space:]]+clean[[:space:]]+-fdx
 git push --mirror	git[[:space:]]+push[[:space:]]+--mirror
 git branch -D main/master	git[[:space:]]+branch[[:space:]]+-D[[:space:]]+(main|master)([[:space:]]|$)
 
 # --- permissions / system ---
-chmod 777	chmod[[:space:]]+(-R[[:space:]]+)?777([[:space:]]|$)
+chmod 777	chmod[[:space:]]+(-R[[:space:]]+)?0?777([[:space:]]|$)
 chmod -R on /	chmod[[:space:]]+-R[[:space:]]+.*/([[:space:]]|$)
 chown -R on /	chown[[:space:]]+-R[[:space:]]+.*/([[:space:]]|$)
 
 # --- remote code / pipes ---
-curl|bash / wget|sh	(curl|wget)[[:space:]].*\|[[:space:]]*(ba)?sh
+curl|bash / wget|sh	(curl|wget)[[:space:]].*\|[[:space:]]*(ba|da|z|k)?sh([[:space:]]|$)|(curl|wget)[[:space:]].*\|[[:space:]]*fish([[:space:]]|$)
 bash -c with rm	(ba)?sh[[:space:]]+-c[[:space:]]+.*rm[[:space:]]
 
 # --- credential / secret reads (hardstop CREAD-* inspired) ---
