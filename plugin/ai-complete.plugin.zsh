@@ -21,9 +21,10 @@ typeset -g AI_COMPLETE_HISTORY="${AI_COMPLETE_HISTORY:-8}"
 typeset -g AI_COMPLETE_MODE="${AI_COMPLETE_MODE:-ghost}"
 typeset -g AI_COMPLETE_GHOST_STYLE="${AI_COMPLETE_GHOST_STYLE:-fg=8}"
 # Safety warn: reverse-video + bold (bg colors on POSTDISPLAY are unreliable).
-# Visible ASCII prefix is the portable “look at me” signal.
-typeset -g AI_COMPLETE_GHOST_WARN_STYLE="${AI_COMPLETE_GHOST_WARN_STYLE:-standout,bold}"
-typeset -g AI_COMPLETE_GHOST_WARN_PREFIX="${AI_COMPLETE_GHOST_WARN_PREFIX:-!!! }"
+# ASCII prefix/suffix and terminal bell are the portable “look at me” signals.
+typeset -g AI_COMPLETE_GHOST_WARN_STYLE=”${AI_COMPLETE_GHOST_WARN_STYLE:-standout,bold}”
+typeset -g AI_COMPLETE_GHOST_WARN_PREFIX=”${AI_COMPLETE_GHOST_WARN_PREFIX:-!!! }”
+typeset -g AI_COMPLETE_GHOST_WARN_SUFFIX=”${AI_COMPLETE_GHOST_WARN_SUFFIX:- !!!}”
 # Save free-text intents to zsh history as "# …" (noop if re-run with interactivecomments)
 typeset -g AI_COMPLETE_SAVE_PROMPTS="${AI_COMPLETE_SAVE_PROMPTS:-1}"
 
@@ -144,8 +145,8 @@ _ai_complete_show_ghost() {
   BUFFER=
   CURSOR=0
   if (( warn )); then
-    # Prefix is display-only; accept still uses _AI_COMPLETE_SUGGESTION
-    POSTDISPLAY="${AI_COMPLETE_GHOST_WARN_PREFIX}${_AI_COMPLETE_SUGGESTION}"
+    # Prefix/suffix are display-only; accept still uses _AI_COMPLETE_SUGGESTION
+    POSTDISPLAY="${AI_COMPLETE_GHOST_WARN_PREFIX}${_AI_COMPLETE_SUGGESTION}${AI_COMPLETE_GHOST_WARN_SUFFIX}"
   else
     POSTDISPLAY="$_AI_COMPLETE_SUGGESTION"
   fi
@@ -168,6 +169,7 @@ ai-complete-accept-widget() {
   _AI_COMPLETE_CAN_UNDO=1
   _ai_complete_syntax_highlight
   if (( warn )); then
+    print -n $'\a'
     # Re-apply after syntax HL (it rebuilds region_highlight)
     _ai_complete_highlight_range 0 $#BUFFER "$AI_COMPLETE_GHOST_WARN_STYLE"
     zle -M "⚠ WARNING accepted — Enter RUNs it (Ctrl+X u = undo)"
@@ -295,6 +297,7 @@ ai-complete-widget() {
     CURSOR=${#BUFFER}
     _ai_complete_syntax_highlight
     if (( warn )); then
+      print -n $'\a'
       _ai_complete_highlight_range 0 $#BUFFER "$AI_COMPLETE_GHOST_WARN_STYLE"
       zle -M "⚠ ${warn_msg:-destructive pattern} — Ctrl+X u to undo"
     else
@@ -303,6 +306,7 @@ ai-complete-widget() {
   else
     _ai_complete_show_ghost "$result" "$warn"
     if (( warn )); then
+      print -n $'\a'
       zle -M "⚠ ${warn_msg:-destructive} — Tab/→/Enter accept, Esc discard"
     else
       zle -M "ai-complete: ghost — Tab/→/Enter accept, Esc discard"

@@ -74,6 +74,8 @@ Environment / `~/.config/zsh-ai-complete/config.env`:
 | `AI_COMPLETE_MODE`     | `ghost`                         | `ghost` (preview) or `replace` (direct buffer swap) |
 | `AI_COMPLETE_SAVE_PROMPTS` | `1`                         | Write `# …` intents into zsh history       |
 | `AI_COMPLETE_ENABLED`  | `1`                             | `0` disables the widget                    |
+| `AI_COMPLETE_GHOST_WARN_PREFIX` | `!!! `               | Text prepended to a safety-warn ghost      |
+| `AI_COMPLETE_GHOST_WARN_SUFFIX` | ` !!!`               | Text appended to a safety-warn ghost       |
 
 ## Safety
 
