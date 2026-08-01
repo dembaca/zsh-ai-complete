@@ -34,8 +34,11 @@ EOF
 
 ai_complete_sanitize() {
   local text="$1"
-  # Strip markdown fences if the model ignored instructions
+  # Strip <think>…</think> blocks emitted by reasoning models (Qwen, etc.)
+  text="$(printf '%s' "$text" | sed '/<think>/,/<\/think>/d')"
+  # Trim whitespace
   text="$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  # Strip markdown fences if the model ignored instructions
   if [[ "$text" == \`\`\`* ]]; then
     text="$(printf '%s\n' "$text" | sed -e '1{/^```/d;}' -e '${/^```$/d;}')"
     text="$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -49,9 +52,16 @@ ai_complete_sanitize() {
 
 ai_complete_system_prompt() {
   cat <<'EOF'
-You convert natural-language intents into a single shell command for macOS zsh.
-Reply with ONLY the command — no explanation, no markdown, no code fences, no quotes around the whole command.
-Prefer portable macOS/BSD flags when relevant. Use the provided context (cwd, git, history) when useful.
+You are a shell command translator. Your output is fed directly to a shell — it must be executable as-is.
+
+Rules (strict):
+- Output ONLY the raw shell command. No reasoning, no explanation, no commentary, no alternatives.
+- No markdown, no code fences, no backticks wrapping the whole command.
+- The very first character of your response must be the first character of the command.
+- One command only. If multiple steps are needed, chain them with && or |.
+
+Context: macOS zsh. Prefer BSD/macOS flags. Use the provided cwd, git, history, and session history when relevant.
+session history contains the last few commands with their exit codes and terminal output, oldest first — use it to understand the workflow and errors.
 If the intent is ambiguous, choose the most common safe interpretation.
 EOF
 }
@@ -104,6 +114,13 @@ EOF
         {role: "user", content: $user}
       ]
     }')"
+
+  if [[ "${AI_COMPLETE_DEBUG:-}" == "1" ]]; then
+    local debug_file="${TMPDIR%/}/ai-complete-debug.json"
+    printf '%s\n' "$payload" | jq . > "$debug_file" 2>/dev/null \
+      || printf '%s\n' "$payload" > "$debug_file"
+    printf 'ai-complete: debug payload → %s\n' "$debug_file" >&2
+  fi
 
   local url="${AI_COMPLETE_ENDPOINT%/}/chat/completions"
   local http_code

@@ -6,7 +6,7 @@ ai_complete_collect_context() {
   local max_git_status=40
   local max_ls=40
   local max_diff_lines=30
-  local cwd os_info last_status last_cmd
+  local cwd os_info last_status last_cmd session_history
   local git_status git_branch git_log git_diff
   local history_lines dir_listing
   local in_git=0
@@ -25,6 +25,9 @@ ai_complete_collect_context() {
       | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//; s/^: [0-9]*:[0-9]*;//')"
   fi
   [[ -z "$last_cmd" ]] && last_cmd="(none)"
+
+  session_history="${AI_COMPLETE_SESSION_CONTEXT:-}"
+  [[ -z "$session_history" ]] && session_history="(none)"
 
   git_status="(not a git repo)"
   git_branch="(n/a)"
@@ -70,6 +73,8 @@ cwd: $cwd
 os: $os_info
 last_exit: $last_status
 last_command: $last_cmd
+session history (oldest → newest, line budget weighted by recency):
+$session_history
 git branch: $git_branch
 git status:
 $git_status
