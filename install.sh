@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Install zsh-ai-complete: config + ~/.zshrc snippet
+# (Oh My Zsh users: clone into $ZSH_CUSTOM/plugins/zsh-ai-complete instead — see README.)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,7 +24,7 @@ write_snippet() {
   cat <<EOF
 $MARKER_BEGIN
 export AI_COMPLETE_ROOT="$ROOT"
-[[ -f "\$AI_COMPLETE_ROOT/plugin/ai-complete.plugin.zsh" ]] && source "\$AI_COMPLETE_ROOT/plugin/ai-complete.plugin.zsh"
+[[ -f "\$AI_COMPLETE_ROOT/zsh-ai-complete.plugin.zsh" ]] && source "\$AI_COMPLETE_ROOT/zsh-ai-complete.plugin.zsh"
 $MARKER_END
 EOF
 }
