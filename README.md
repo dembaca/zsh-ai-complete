@@ -4,13 +4,13 @@ LLM-powered shell completion for zsh. Type what you want in plain language, pres
 
 ![Demo of zsh-ai-complete](demo.gif)
 
-Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`) on my Apple Silicon. Use whatever you have.
+Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/completions`) on my Apple Silicon. I made goo experiences with a Use whatever you have.
 
 ## Requirements
 
 - zsh
 - `curl` and `jq`
-- OpenAI-compatible server, e.g. an oMLX on `http://127.0.0.1:8000/v1`
+- OpenAI-compatible server
 
 ## Install
 
