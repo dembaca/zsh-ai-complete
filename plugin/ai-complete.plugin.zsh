@@ -34,6 +34,18 @@ typeset -g _AI_COMPLETE_CAN_UNDO=0
 typeset -g AI_COMPLETE_SAVED_STATUS=0
 typeset -g AI_COMPLETE_SAVED_CMD=
 
+typeset -g AI_COMPLETE_CAPTURE_OUTPUT="${AI_COMPLETE_CAPTURE_OUTPUT:-1}"
+typeset -g AI_COMPLETE_CMD_HISTORY="${AI_COMPLETE_CMD_HISTORY:-3}"
+typeset -g AI_COMPLETE_TOTAL_OUTPUT_LINES="${AI_COMPLETE_TOTAL_OUTPUT_LINES:-200}"
+typeset -g AI_COMPLETE_DEBUG="${AI_COMPLETE_DEBUG:-}"
+typeset -g AI_COMPLETE_LAST_OUTPUT=
+typeset -g _AI_COMPLETE_OUTPUT_TMP=
+typeset -g _AI_COMPLETE_SAVED_OUT=
+typeset -g _AI_COMPLETE_SAVED_ERR=
+typeset -ga _AI_COMPLETE_BUF_CMD=()
+typeset -ga _AI_COMPLETE_BUF_EXIT=()
+typeset -ga _AI_COMPLETE_BUF_OUT=()
+
 typeset -g _AI_COMPLETE_PENDING=0
 typeset -g _AI_COMPLETE_SUGGESTION=
 typeset -g _AI_COMPLETE_SUGGESTION_WARN=0
@@ -57,11 +69,110 @@ setopt interactivecomments
 _ai_complete_precmd() {
   AI_COMPLETE_SAVED_STATUS=$?
   AI_COMPLETE_SAVED_CMD="${$(fc -ln -1 2>/dev/null)##[[:space:]]#}"
+  # Restore stdout/stderr redirected by _ai_complete_preexec_capture.
+  # Closing the old write-end of the tee pipe here signals EOF to tee;
+  # by the time the user types and triggers the widget, tee has finished.
+  if [[ -n "${_AI_COMPLETE_SAVED_OUT:-}" ]]; then
+    exec 1>&"${_AI_COMPLETE_SAVED_OUT}" 2>&"${_AI_COMPLETE_SAVED_ERR}"
+    exec {_AI_COMPLETE_SAVED_OUT}>&- {_AI_COMPLETE_SAVED_ERR}>&-
+    _AI_COMPLETE_SAVED_OUT=
+    _AI_COMPLETE_SAVED_ERR=
+  fi
   # Fresh prompt: drop any leftover ghost
   _ai_complete_clear_ghost
 }
 precmd_functions=(${precmd_functions:#_ai_complete_precmd})
 precmd_functions=(_ai_complete_precmd ${precmd_functions[@]})
+
+# Tee stdout+stderr through a temp file so the widget can include last output.
+# preexec runs after ZLE, before the command — safe to redirect here.
+# Also commits the previous command's output to the rolling buffer; by the time
+# preexec fires for the next command, the previous tee is definitely done.
+_ai_complete_preexec_capture() {
+  [[ "${AI_COMPLETE_CAPTURE_OUTPUT:-1}" == "1" ]] || return 0
+  # Previous command's temp file is safe to read now (tee exited after precmd closed the pipe)
+  if [[ -n "${_AI_COMPLETE_OUTPUT_TMP:-}" && -f "$_AI_COMPLETE_OUTPUT_TMP" ]]; then
+    local _prev_out
+    _prev_out="$(cat "$_AI_COMPLETE_OUTPUT_TMP" 2>/dev/null \
+      | sed $'s/\033\\[[0-9;]*[A-Za-z]//g' | tr -d '\r')"
+    _ai_complete_buffer_push "$AI_COMPLETE_SAVED_CMD" "$AI_COMPLETE_SAVED_STATUS" "$_prev_out"
+    rm -f "$_AI_COMPLETE_OUTPUT_TMP"
+    _AI_COMPLETE_OUTPUT_TMP=
+  fi
+  local tmp
+  tmp="$(mktemp 2>/dev/null)" || return 0
+  _AI_COMPLETE_OUTPUT_TMP="$tmp"
+  exec {_AI_COMPLETE_SAVED_OUT}>&1 {_AI_COMPLETE_SAVED_ERR}>&2
+  exec 1> >(tee -a "$_AI_COMPLETE_OUTPUT_TMP" >&"${_AI_COMPLETE_SAVED_OUT}") 2>&1
+}
+preexec_functions=(${preexec_functions:#_ai_complete_preexec_capture})
+preexec_functions=(_ai_complete_preexec_capture ${preexec_functions[@]})
+
+# Push one entry onto the front of the rolling buffer; trim to AI_COMPLETE_CMD_HISTORY depth.
+_ai_complete_buffer_push() {
+  local cmd="$1" exit_code="$2" output="$3"
+  local max="${AI_COMPLETE_CMD_HISTORY:-3}"
+  _AI_COMPLETE_BUF_CMD=("$cmd" "${_AI_COMPLETE_BUF_CMD[@]}")
+  _AI_COMPLETE_BUF_EXIT=("$exit_code" "${_AI_COMPLETE_BUF_EXIT[@]}")
+  _AI_COMPLETE_BUF_OUT=("$output" "${_AI_COMPLETE_BUF_OUT[@]}")
+  (( ${#_AI_COMPLETE_BUF_CMD[@]} > max )) && {
+    _AI_COMPLETE_BUF_CMD=("${_AI_COMPLETE_BUF_CMD[@]:0:$max}")
+    _AI_COMPLETE_BUF_EXIT=("${_AI_COMPLETE_BUF_EXIT[@]:0:$max}")
+    _AI_COMPLETE_BUF_OUT=("${_AI_COMPLETE_BUF_OUT[@]:0:$max}")
+  }
+}
+
+# Read the current command's captured output (lazy — tee is done by the time the
+# user types an intent and hits the keybinding). Leaves AI_COMPLETE_LAST_OUTPUT
+# unchanged if there is no new capture file (re-triggering the widget reuses it).
+_ai_complete_read_last_output() {
+  [[ -n "${_AI_COMPLETE_OUTPUT_TMP:-}" && -f "$_AI_COMPLETE_OUTPUT_TMP" ]] || return 0
+  AI_COMPLETE_LAST_OUTPUT="$(cat "$_AI_COMPLETE_OUTPUT_TMP" 2>/dev/null \
+    | sed $'s/\033\\[[0-9;]*[A-Za-z]//g' | tr -d '\r')"
+  rm -f "$_AI_COMPLETE_OUTPUT_TMP"
+  _AI_COMPLETE_OUTPUT_TMP=
+}
+
+# Build the session-history string passed to the LLM.
+# Line budget is shared across all positions using triangular weighting:
+# position 1 = current command (most lines), position N+1 = oldest buffered (fewest).
+_ai_complete_format_session_context() {
+  local total="${AI_COMPLETE_TOTAL_OUTPUT_LINES:-200}"
+  local buf_n=${#_AI_COMPLETE_BUF_CMD[@]}
+  local total_pos=$(( buf_n + 1 ))
+  local tri_sum=$(( total_pos * (total_pos + 1) / 2 ))
+
+  local -a entries=()
+  local i weight lines out_trunc
+
+  # Buffer entries oldest-first so the LLM reads them chronologically
+  for (( i = buf_n; i >= 1; i-- )); do
+    weight=$(( total_pos - i ))
+    lines=$(( total * weight / tri_sum ))
+    out_trunc="$(printf '%s' "${_AI_COMPLETE_BUF_OUT[$i]}" | tail -n "$lines" 2>/dev/null)"
+    entries+=("command: ${_AI_COMPLETE_BUF_CMD[$i]:-?}
+exit: ${_AI_COMPLETE_BUF_EXIT[$i]:-?}
+output:
+${out_trunc:-(none)}")
+  done
+
+  # Current command last — highest weight, most lines
+  weight=$total_pos
+  lines=$(( total * weight / tri_sum ))
+  out_trunc="$(printf '%s' "${AI_COMPLETE_LAST_OUTPUT:-}" | tail -n "$lines" 2>/dev/null)"
+  entries+=("command: ${AI_COMPLETE_SAVED_CMD:-?}
+exit: ${AI_COMPLETE_SAVED_STATUS:-?}
+output:
+${out_trunc:-(none)}")
+
+  local total_entries=${#entries[@]}
+  local result="" j
+  for (( j = 1; j <= total_entries; j++ )); do
+    [[ -n "$result" ]] && result+=$'\n'
+    result+="[$j/$total_entries] ${entries[$j]}"
+  done
+  printf '%s' "$result"
+}
 
 ai-enable() {
   typeset -g AI_COMPLETE_ENABLED=1
@@ -80,9 +191,15 @@ ai-status() {
   [[ -n "${AI_COMPLETE_API_KEY:-}" ]] && key="(set)"
   local enabled="off"
   [[ "$AI_COMPLETE_ENABLED" == "1" ]] && enabled="on"
+  local capture="off"
+  [[ "${AI_COMPLETE_CAPTURE_OUTPUT:-1}" == "1" ]] && capture="on (${AI_COMPLETE_CMD_HISTORY:-3} cmds, ${AI_COMPLETE_TOTAL_OUTPUT_LINES:-200} lines total, triangular)"
+  local debug="off"
+  [[ "${AI_COMPLETE_DEBUG:-}" == "1" ]] && debug="on → ${TMPDIR%/}/ai-complete-debug.json"
   print "ai-complete: $enabled"
   print "  mode:     $AI_COMPLETE_MODE"
   print "  prompts:  ${AI_COMPLETE_SAVE_PROMPTS} (# … → history)"
+  print "  capture:  $capture"
+  print "  debug:    $debug"
   print "  endpoint: $AI_COMPLETE_ENDPOINT"
   print "  model:    $model"
   print "  api key:  $key"
@@ -216,6 +333,9 @@ ai-complete-widget() {
   local intent="$BUFFER"
   local last_status="${AI_COMPLETE_SAVED_STATUS:-0}"
   local last_cmd="${AI_COMPLETE_SAVED_CMD:-}"
+  _ai_complete_read_last_output
+  local session_context
+  session_context="$(_ai_complete_format_session_context)"
 
   if [[ "$AI_COMPLETE_ENABLED" != "1" ]]; then
     zle -M "ai-complete: disabled (ai-enable to turn on)"
@@ -256,6 +376,8 @@ ai-complete-widget() {
     AI_COMPLETE_HISTORY="$AI_COMPLETE_HISTORY" \
     AI_COMPLETE_LAST_STATUS="$last_status" \
     AI_COMPLETE_LAST_CMD="$last_cmd" \
+    AI_COMPLETE_SESSION_CONTEXT="$session_context" \
+    AI_COMPLETE_DEBUG="${AI_COMPLETE_DEBUG:-}" \
     HISTFILE="${HISTFILE:-$HOME/.zsh_history}" \
     "$AI_COMPLETE_BIN" -- "$intent" 2>"$tmp_err"
   )"
@@ -313,6 +435,9 @@ ai-complete-widget() {
     fi
   fi
 
+  if [[ "${AI_COMPLETE_DEBUG:-}" == "1" ]]; then
+    zle -M "ai-complete: debug → ${TMPDIR%/}/ai-complete-debug.json"
+  fi
   zle -R
 }
 
