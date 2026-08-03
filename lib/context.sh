@@ -13,8 +13,15 @@ ai_complete_collect_context() {
 
   cwd="${PWD:-$(pwd)}"
 
+  local kernel
+  kernel="$(uname -s 2>/dev/null || echo unknown)"
   os_info="$(uname -srm 2>/dev/null || echo unknown)"
   os_info+=" shell=${SHELL:-unknown}"
+  case "$kernel" in
+    Darwin) os_info+=" family=macos/bsd (not GNU)" ;;
+    Linux)  os_info+=" family=linux/gnu" ;;
+    *BSD|DragonFly) os_info+=" family=bsd (not GNU)" ;;
+  esac
 
   # Passed from the zsh widget when available; else unknown
   last_status="${AI_COMPLETE_LAST_STATUS:-unknown}"

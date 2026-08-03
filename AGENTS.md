@@ -31,7 +31,10 @@ The plugin has two layers that communicate only via subprocess + exit code:
 4. Sources `lib/safety.sh` to pattern-match against `lib/dangerous.patterns`
 5. Exits `0` (clean), `2` (command on stdout but safety warning on stderr), or `1` (error)
 
-**`plugin/ai-complete.plugin.zsh`** — the ZLE layer:
+**`zsh-ai-complete.plugin.zsh`** — the ZLE layer (repo-root entry point for Oh My Zsh):
+- Oh My Zsh loads `$ZSH_CUSTOM/plugins/zsh-ai-complete/zsh-ai-complete.plugin.zsh` when the plugin name is in `plugins=(...)`
+- `AI_COMPLETE_ROOT` defaults to the directory containing this file (the clone/repo root)
+- On first load, copies `config/default.env` → `~/.config/zsh-ai-complete/config.env` if missing
 - Wraps `accept-line`, `expand-or-complete`, `forward-char`, `self-insert`, `backward-delete-char`, `send-break` using `_ai_complete_wrap` / `_ai_complete_call_orig` to chain without clobbering fzf-tab or other plugins
 - State machine: `_AI_COMPLETE_PENDING` tracks whether a ghost suggestion is displayed; all bound keys check this first
 - Ghost text lives in `POSTDISPLAY`; style applied via `region_highlight`
@@ -50,6 +53,6 @@ The plugin has two layers that communicate only via subprocess + exit code:
 
 ## Configuration
 
-User config lives at `~/.config/zsh-ai-complete/config.env` (XDG-aware). The install script (`install.sh`) copies `config/default.env` there on first run and appends a sourcing block to `~/.zshrc`.
+User config lives at `~/.config/zsh-ai-complete/config.env` (XDG-aware). Created automatically on first plugin load, or by `install.sh` (non-OMZ path).
 
 `AI_COMPLETE_MODEL` has no default and must be set. All other variables have defaults in the plugin file.

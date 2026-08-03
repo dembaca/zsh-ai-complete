@@ -1,14 +1,15 @@
 # zsh-ai-complete — ZLE widget + helpers
-# Source from ~/.zshrc or via install.sh
+# Loaded by Oh My Zsh / plugin managers, or via install.sh / direct source.
 #
-# experiment/ghost-text: suggestions appear as POSTDISPLAY ghost text.
+# Ghost-text: suggestions appear as POSTDISPLAY preview.
 # Accept: Tab / → / Enter (puts command in BUFFER, does NOT run)
 # Discard: Esc / Ctrl+X u / typing
-# Switch back: AI_COMPLETE_MODE=replace  or checkout main
+# Switch: AI_COMPLETE_MODE=replace for direct buffer swap
 
 () {
   local plugin_dir="${${(%):-%x}:A:h}"
-  typeset -g AI_COMPLETE_ROOT="${AI_COMPLETE_ROOT:-${plugin_dir:A}/..}"
+  # Repo root = directory containing this .plugin.zsh file
+  typeset -g AI_COMPLETE_ROOT="${AI_COMPLETE_ROOT:-${plugin_dir:A}}"
   AI_COMPLETE_ROOT="${AI_COMPLETE_ROOT:A}"
 }
 
@@ -17,14 +18,14 @@ typeset -g AI_COMPLETE_ENABLED="${AI_COMPLETE_ENABLED:-1}"
 typeset -g AI_COMPLETE_ENDPOINT="${AI_COMPLETE_ENDPOINT:-http://127.0.0.1:8000/v1}"
 typeset -g AI_COMPLETE_TIMEOUT="${AI_COMPLETE_TIMEOUT:-30}"
 typeset -g AI_COMPLETE_HISTORY="${AI_COMPLETE_HISTORY:-8}"
-# ghost (default on this branch) | replace
+# ghost (default) | replace
 typeset -g AI_COMPLETE_MODE="${AI_COMPLETE_MODE:-ghost}"
 typeset -g AI_COMPLETE_GHOST_STYLE="${AI_COMPLETE_GHOST_STYLE:-fg=8}"
 # Safety warn: reverse-video + bold (bg colors on POSTDISPLAY are unreliable).
 # ASCII prefix/suffix and terminal bell are the portable “look at me” signals.
-typeset -g AI_COMPLETE_GHOST_WARN_STYLE=”${AI_COMPLETE_GHOST_WARN_STYLE:-standout,bold}”
-typeset -g AI_COMPLETE_GHOST_WARN_PREFIX=”${AI_COMPLETE_GHOST_WARN_PREFIX:-!!! }”
-typeset -g AI_COMPLETE_GHOST_WARN_SUFFIX=”${AI_COMPLETE_GHOST_WARN_SUFFIX:- !!!}”
+typeset -g AI_COMPLETE_GHOST_WARN_STYLE="${AI_COMPLETE_GHOST_WARN_STYLE:-standout,bold}"
+typeset -g AI_COMPLETE_GHOST_WARN_PREFIX="${AI_COMPLETE_GHOST_WARN_PREFIX:-!!! }"
+typeset -g AI_COMPLETE_GHOST_WARN_SUFFIX="${AI_COMPLETE_GHOST_WARN_SUFFIX:- !!!}"
 # Save free-text intents to zsh history as "# …" (noop if re-run with interactivecomments)
 typeset -g AI_COMPLETE_SAVE_PROMPTS="${AI_COMPLETE_SAVE_PROMPTS:-1}"
 
@@ -51,16 +52,27 @@ typeset -g _AI_COMPLETE_SUGGESTION=
 typeset -g _AI_COMPLETE_SUGGESTION_WARN=0
 typeset -g _AI_COMPLETE_LAST_HIGHLIGHT=
 
+# Bootstrap config for Oh My Zsh / plugin-manager installs (no install.sh)
+_ai_complete_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/zsh-ai-complete"
+if [[ ! -f "$_ai_complete_config_dir/config.env" ]]; then
+  mkdir -p "$_ai_complete_config_dir"
+  if [[ -f "$AI_COMPLETE_ROOT/config/default.env" ]]; then
+    cp "$AI_COMPLETE_ROOT/config/default.env" "$_ai_complete_config_dir/config.env"
+    print -u2 "ai-complete: created $_ai_complete_config_dir/config.env — set AI_COMPLETE_MODEL"
+  fi
+fi
+
 # Load user config if present
-if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/zsh-ai-complete/config.env" ]]; then
+if [[ -f "$_ai_complete_config_dir/config.env" ]]; then
   set -a
   # shellcheck disable=SC1090
-  source "${XDG_CONFIG_HOME:-$HOME/.config}/zsh-ai-complete/config.env"
+  source "$_ai_complete_config_dir/config.env"
   set +a
   # Revoke the export flag from credential variables — set -a would otherwise
   # leave them exported into every child process for the session lifetime.
   typeset +x AI_COMPLETE_API_KEY 2>/dev/null || true
 fi
+unset _ai_complete_config_dir
 
 # So "# …" history entries are harmless if executed
 setopt interactivecomments

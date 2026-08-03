@@ -51,7 +51,35 @@ ai_complete_sanitize() {
 }
 
 ai_complete_system_prompt() {
-  cat <<'EOF'
+  local kernel
+  kernel="$(uname -s 2>/dev/null || echo unknown)"
+  local os_line shell_line
+  case "$kernel" in
+    Darwin)
+      os_line="Target: macOS (Darwin) with zsh — BSD userland, not GNU/Linux."
+      shell_line="Use macOS/BSD flag variants. Do NOT invent GNU-only options.
+Examples of differences to respect:
+- sed -i requires an extension arg: sed -i '' … (not sed -i …)
+- date, stat, find, ps, netstat, df use BSD syntax (no GNU long opts like --printf, -I{}, -P for grep)
+- Prefer built-ins / stock tools (pbcopy/pbpaste, open, xattr, mdls) over Linux-only ones (xclip, xdg-open, lsblk)
+- For GNU-only needs, prefer a portable rewrite or brew-prefixed tools only if clearly installed in context"
+      ;;
+    Linux)
+      os_line="Target: Linux with ${SHELL##*/} — GNU userland."
+      [[ -z "${SHELL:-}" ]] && os_line="Target: Linux — GNU userland."
+      shell_line="Use GNU/Linux flag variants and common Linux tools. Avoid macOS-only utilities (pbcopy, open, mdls, xattr) unless clearly available."
+      ;;
+    FreeBSD|OpenBSD|NetBSD|DragonFly)
+      os_line="Target: $kernel with BSD userland."
+      shell_line="Use BSD flag variants (not GNU). Avoid Linux-only and macOS-only utilities unless clearly available."
+      ;;
+    *)
+      os_line="Target OS kernel: $kernel (see Context os: line)."
+      shell_line="Match tools and flags to that OS. Prefer portable POSIX constructs when unsure."
+      ;;
+  esac
+
+  cat <<EOF
 You are a shell command translator. Your output is fed directly to a shell — it must be executable as-is.
 
 Rules (strict):
@@ -60,7 +88,10 @@ Rules (strict):
 - The very first character of your response must be the first character of the command.
 - One command only. If multiple steps are needed, chain them with && or |.
 
-Context: macOS zsh. Prefer BSD/macOS flags. Use the provided cwd, git, history, and session history when relevant.
+$os_line
+$shell_line
+Always honor the Context os: line; never assume a different OS.
+Use the provided cwd, git, history, directory listing, and session history when relevant.
 session history contains the last few commands with their exit codes and terminal output, oldest first — use it to understand the workflow and errors.
 If the intent is ambiguous, choose the most common safe interpretation.
 EOF

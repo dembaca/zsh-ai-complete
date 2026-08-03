@@ -14,11 +14,28 @@ Talks to a local [oMLX](https://omlx.ai/) OpenAI-compatible endpoint (`/v1/chat/
 
 ## Install
 
+### Oh My Zsh
+
+```bash
+git clone https://github.com/dembaca/zsh-ai-complete \
+  ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-ai-complete
+```
+
+Add `zsh-ai-complete` to the `plugins=(...)` list in `~/.zshrc`, then reload the shell.
+
+On first load the plugin creates `~/.config/zsh-ai-complete/config.env` from the defaults — set `AI_COMPLETE_MODEL` there (see below).
+
+### Without Oh My Zsh
+
 ```bash
 ./install.sh
 ```
 
-Then edit `~/.config/zsh-ai-complete/config.env`:
+That copies the config template (if missing) and appends a sourcing block to `~/.zshrc`.
+
+### Config
+
+Edit `~/.config/zsh-ai-complete/config.env`:
 
 ```bash
 AI_COMPLETE_MODEL=your-model-id
@@ -92,14 +109,14 @@ Patterns are a curated subset rewritten for bash `[[ =~ ]]`, inspired by **[hard
 ## Layout
 
 ```
+zsh-ai-complete.plugin.zsh      # ZLE widget (Oh My Zsh entry point)
 bin/ai-complete                 # bash client
 lib/context.sh                  # cwd / git / history / os
 lib/safety.sh                   # pattern loader + check
 lib/dangerous.patterns          # curated warn list (bash ERE)
 NOTICE                          # hardstop-patterns attribution (MIT)
-plugin/ai-complete.plugin.zsh   # ZLE widget + Ctrl+X Ctrl+X
-config/default.env              # install template
-install.sh
+config/default.env              # config template
+install.sh                      # non-OMZ installer
 ```
 
 ## Disclaimer
